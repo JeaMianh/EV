@@ -1,0 +1,164 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EV Log Copilot Sessions</title>
+    <link rel="stylesheet" href="/styles.css?v=20260310-7" />
+  </head>
+  <body>
+    <header class="top-app-bar">
+      <div class="bar-brand">
+        <div class="brand-mark">EV</div>
+        <div>
+          <p class="eyebrow">Debug Workspace</p>
+          <h1>调试会话中心</h1>
+        </div>
+      </div>
+      <nav class="page-nav" aria-label="主导航">
+        <a class="page-link" href="/">仿真总览</a>
+        <a class="page-link active" href="/sessions">调试会话</a>
+        <a class="page-link" href="/settings">设置</a>
+      </nav>
+      <div class="bar-actions">
+        <span class="connection-chip">
+          <span class="status-dot" id="connectionDot"></span>
+          <span id="connectionText">正在连接服务</span>
+        </span>
+        <span class="provider-chip" id="providerStatusText">AI Provider 检查中</span>
+      </div>
+    </header>
+
+    <div class="session-manager-shell">
+      <aside class="session-sidebar surface-card">
+        <div class="sidebar-topbar">
+          <div>
+            <p class="section-kicker" id="sidebarKickerText">Sessions</p>
+            <h2 id="sidebarTitleText">调试会话</h2>
+            <p class="supporting-text" id="sessionCountText">0 个会话</p>
+          </div>
+          <div class="sidebar-actions">
+            <button class="text-button" id="sidebarBackButton" type="button" hidden>返回上级</button>
+            <button class="filled-tonal-button inline-tonal-button" id="createSessionButton" type="button">新建会话</button>
+          </div>
+        </div>
+        <div class="session-sidebar-list" id="sessionList"></div>
+      </aside>
+
+      <main class="manager-main">
+        <section class="surface-card focus-run-card">
+          <div class="card-head align-start">
+            <div>
+              <p class="section-kicker">Focus Run</p>
+              <h2>当前焦点仿真</h2>
+              <p class="supporting-text" id="focusRunMetaText">可以直接从全部仿真目录里搜索并切换焦点 run，也可以把它加入当前调试会话。</p>
+            </div>
+            <div class="session-head-actions wrap-end focus-run-toolbar">
+              <input id="focusRunSearchInput" type="search" placeholder="搜索 runId" aria-label="搜索 runId" />
+              <select id="focusRunSelect" aria-label="选择焦点 run"></select>
+              <button class="text-button" id="openRunViewerButton" type="button">在主页查看</button>
+            </div>
+          </div>
+
+          <div class="focus-run-grid">
+            <div class="focus-run-preview image-stage compact-stage">
+              <img id="focusRunImage" alt="focus run preview" />
+              <div class="image-empty" id="focusRunImageEmpty">当前焦点 run 没有可显示的图片</div>
+            </div>
+            <div class="focus-run-panel">
+              <div class="session-meta-pills">
+                <span class="assist-chip" id="focusRunCoverageText">覆盖率 -</span>
+                <span class="assist-chip" id="focusRunErrorText">误差 -</span>
+                <span class="assist-chip" id="focusRunUpdatedText">更新时间 -</span>
+              </div>
+              <div class="focus-run-summary" id="focusRunSummaryText">焦点 run 的摘要会显示在这里。</div>
+              <button class="filled-button" id="addCurrentRunButton" type="button">加入当前会话</button>
+            </div>
+          </div>
+
+          <div class="session-note-grid">
+            <label>
+              <span>本次调整说明</span>
+              <textarea id="changeNoteInput" rows="3" placeholder="这次改了哪些参数或逻辑"></textarea>
+            </label>
+            <label>
+              <span>调整假设</span>
+              <textarea id="hypothesisInput" rows="3" placeholder="为什么这样改，预期会改善什么"></textarea>
+            </label>
+            <label>
+              <span>结果备注</span>
+              <textarea id="resultNoteInput" rows="3" placeholder="观察到的结果、副作用或下一步判断"></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="surface-card session-card">
+          <div class="session-head align-start">
+            <div>
+              <p class="section-kicker">Session Detail</p>
+              <h2 id="sessionTitleHeading">未选择调试会话</h2>
+              <p class="supporting-text" id="sessionMetaText">先在左侧创建或选择一个调试会话，然后再把 run 纳入时间线。</p>
+            </div>
+            <div class="session-toolbar">
+              <select id="sessionQuickSelect" aria-label="快速切换调试会话"></select>
+              <button class="outlined-button" id="deleteCurrentSessionButton" type="button">删除当前会话</button>
+            </div>
+            <div class="session-meta-pills">
+              <span class="assist-chip" id="sessionThreadStatus">会话上下文尚未建立</span>
+              <span class="assist-chip" id="sessionRunCountText">0 个 run</span>
+              <span class="assist-chip" id="sessionMessageCountText">0 条消息</span>
+            </div>
+          </div>
+
+          <div class="session-editor-grid">
+            <label>
+              <span>会话标题</span>
+              <input id="sessionTitleInput" type="text" placeholder="例如：弯道跟踪优化" />
+            </label>
+            <label class="session-editor-wide">
+              <span>调试目标</span>
+              <input id="sessionGoalInput" type="text" placeholder="例如：降低末端振荡，同时保持锁定率" />
+            </label>
+            <div class="session-editor-actions full-span">
+              <button class="text-button" id="saveSessionMetaButton" type="button">保存会话信息</button>
+            </div>
+          </div>
+
+          <div class="section-heading session-timeline-heading">
+            <div>
+              <h3>时间线 run 管理</h3>
+              <p class="supporting-text">每个条目都代表一次调参阶段。可以定位、删除，并持续围绕它们对话。</p>
+            </div>
+          </div>
+          <div class="session-timeline" id="sessionTimeline"></div>
+        </section>
+      </main>
+
+      <aside class="chat-panel surface-card">
+        <div class="sidebar-topbar assistant-topbar">
+          <div>
+            <p class="section-kicker">Assistant</p>
+            <h2>AI 助手</h2>
+          </div>
+        </div>
+
+        <div class="assistant-head">
+          <p class="supporting-text" id="assistantSessionText">请选择一个调试会话，并指定当前焦点 run。助手会结合时间线和历史消息持续分析。</p>
+        </div>
+
+        <div class="chat-stream chat-stream-large" id="chatStream"></div>
+        <form class="chat-form" id="chatForm">
+          <textarea
+            id="chatInput"
+            rows="6"
+            placeholder="例如：请结合这条调试时间线，分析当前焦点 run 为什么仍然掉点严重"
+          ></textarea>
+          <button id="sendButton" class="filled-button" type="submit">发送给助手</button>
+        </form>
+      </aside>
+    </div>
+
+    <script src="/settings-store.js?v=20260310-7"></script>
+    <script src="/sessions.js?v=20260310-7"></script>
+  </body>
+</html>

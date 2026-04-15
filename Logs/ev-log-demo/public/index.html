@@ -1,0 +1,162 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EV Log Copilot</title>
+    <link rel="stylesheet" href="/styles.css?v=20260310-7" />
+  </head>
+  <body>
+    <header class="top-app-bar">
+      <div class="bar-brand">
+        <div class="brand-mark">EV</div>
+        <div>
+          <p class="eyebrow">Material Workspace</p>
+          <h1>EV Log Copilot</h1>
+        </div>
+      </div>
+      <nav class="page-nav" aria-label="主导航">
+        <a class="page-link active" href="/">仿真总览</a>
+        <a class="page-link" href="/sessions">调试会话</a>
+        <a class="page-link" href="/settings">设置</a>
+      </nav>
+      <div class="bar-actions">
+        <button class="text-button" id="toggleLeftSidebarButton" type="button">收起目录</button>
+        <span class="connection-chip">
+          <span class="status-dot" id="connectionDot"></span>
+          <span id="connectionText">正在连接服务</span>
+        </span>
+        <span class="provider-chip" id="providerStatusText">AI Provider 检查中</span>
+      </div>
+    </header>
+
+    <div class="analysis-shell">
+      <aside class="nav-drawer surface-card">
+        <div class="sidebar-topbar">
+          <div>
+            <p class="section-kicker">Runs</p>
+            <h2>仿真目录</h2>
+            <p class="supporting-text" id="lastScanText">等待首次扫描结果</p>
+          </div>
+          <button class="icon-text-button" id="collapseLeftSidebarButton" type="button">收起</button>
+        </div>
+
+        <div class="section-heading compact">
+          <span class="count-pill" id="runCountText">0 runs</span>
+        </div>
+
+        <div class="run-list" id="runList"></div>
+      </aside>
+
+      <main class="analysis-main">
+        <section class="hero-card surface-card">
+          <div class="hero-copy">
+            <p class="section-kicker">Run Viewer</p>
+            <h2 id="runTitle">等待选择日志</h2>
+            <p class="supporting-text" id="runSubtitle">主页只负责查看本地仿真数据。调试过程编排和 AI 连续对话请转到“调试会话”页。</p>
+          </div>
+          <div class="hero-actions">
+            <button class="filled-button" id="openSessionsButton" type="button">带着当前 run 去调试会话</button>
+          </div>
+        </section>
+
+        <section class="metrics-grid" id="summaryGrid">
+          <article class="metric-card surface-card">
+            <p class="metric-label">仿真时长</p>
+            <p class="metric-value">-</p>
+          </article>
+          <article class="metric-card surface-card">
+            <p class="metric-label">检测覆盖率</p>
+            <p class="metric-value">-</p>
+          </article>
+          <article class="metric-card surface-card">
+            <p class="metric-label">平均距离误差</p>
+            <p class="metric-value">-</p>
+          </article>
+          <article class="metric-card surface-card">
+            <p class="metric-label">目标丢失比例</p>
+            <p class="metric-value">-</p>
+          </article>
+        </section>
+
+        <section class="chart-grid">
+          <article class="chart-card surface-card">
+            <div class="chart-card-head">
+              <div>
+                <h3>速度轨迹</h3>
+                <p class="supporting-text">Ego vs Target</p>
+              </div>
+              <button class="icon-text-button" type="button" data-expand-chart="speed">放大查看</button>
+            </div>
+            <div class="chart-canvas-wrap">
+              <canvas id="speedChart"></canvas>
+            </div>
+          </article>
+
+          <article class="chart-card surface-card">
+            <div class="chart-card-head">
+              <div>
+                <h3>距离观测</h3>
+                <p class="supporting-text">Ground Truth vs Radar</p>
+              </div>
+              <button class="icon-text-button" type="button" data-expand-chart="distance">放大查看</button>
+            </div>
+            <div class="chart-canvas-wrap">
+              <canvas id="distanceChart"></canvas>
+            </div>
+          </article>
+
+          <article class="chart-card surface-card chart-card-wide">
+            <div class="chart-card-head">
+              <div>
+                <h3>跟踪状态</h3>
+                <p class="supporting-text">Detection, Loss, Ghost</p>
+              </div>
+              <button class="icon-text-button" type="button" data-expand-chart="status">放大查看</button>
+            </div>
+            <div class="chart-canvas-wrap wide">
+              <canvas id="statusChart"></canvas>
+            </div>
+          </article>
+        </section>
+
+        <section class="analysis-grid">
+          <article class="surface-card image-card image-card-wide">
+            <div class="card-head">
+              <div>
+                <h3>分析图片</h3>
+                <p class="supporting-text" id="imageMetaText">暂无图片</p>
+              </div>
+            </div>
+            <div class="image-stage">
+              <img id="mainImage" alt="analysis preview" />
+              <div class="image-empty" id="imageEmpty">当前 run 没有可显示的分析图片</div>
+            </div>
+            <div class="thumb-list" id="thumbList"></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <div class="overlay" id="chartModal" hidden>
+      <div class="overlay-backdrop" id="chartModalBackdrop"></div>
+      <section class="overlay-dialog surface-card chart-dialog">
+        <div class="chart-dialog-head">
+          <div>
+            <p class="section-kicker">Expanded Chart</p>
+            <h2 id="chartModalTitle">图表预览</h2>
+            <p class="supporting-text" id="chartModalSubtitle">查看更大的曲线细节。</p>
+          </div>
+          <button id="closeChartModalButton" class="text-button" type="button">关闭</button>
+        </div>
+        <div class="chart-modal-stage">
+          <canvas id="chartModalCanvas"></canvas>
+        </div>
+      </section>
+    </div>
+
+    <script src="/vendor/chart.umd.js"></script>
+    <script src="/settings-store.js?v=20260310-7"></script>
+    <script src="/app.js?v=20260310-7"></script>
+  </body>
+</html>

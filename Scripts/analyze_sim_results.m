@@ -1,0 +1,258 @@
+function analyze_sim_results(out)
+    % ANALYZE_SIM_RESULTS 自动分析驾驶仿真数据
+    % 功能：对齐时间轴，计算误差，识别幽灵物体，导出可视化图表与 JSON
+    
+    %% 1. 初始化设置
+    % 配置保存路径 (按时间戳)
+    logRoot = 'D:\GraduationProject\EV\Logs';
+    timestamp = string(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
+    saveDir = fullfile(logRoot, timestamp);
+    
+    % 检查数据源
+    if ~isprop(out, 'LogData')
+        error('错误: 输出数据中未找到 LogData，请检查 Simulink 的 Signal Logging 设置。');
+    end
+    logs = out.LogData;
+    
+    % 检查必要信号
+    if ~isfield(logs, 'EgoState') || ~isfield(logs.EgoState, 'X')
+        error('错误: 缺少本车位置数据 (EgoState.X)，无法分析。');
+    end
+    
+    % 创建目录
+    if ~exist(saveDir, 'dir'), mkdir(saveDir); end
+    fprintf('------------------------------------------------\n');
+    fprintf('>>> 开始分析仿真数据: %s\n', timestamp);
+
+    %% 2. 数据提取与对齐
+    % 建立主时间轴 (以本车位置更新率为准)
+    masterTime = logs.EgoState.X.Time;
+    
+    % 定义对齐工具函数 (线性插值 & 最近邻插值)
+    align_lin = @(ts) safe_resample(ts, masterTime, 'linear');
+    align_id  = @(ts) safe_resample(ts, masterTime, 'nearest'); % ID不能插值，只能取最近
+
+    % --- A. 本车数据 (Ego) ---
+    Ego.X = logs.EgoState.X.Data;
+    Ego.Y = logs.EgoState.Y.Data;
+    % 计算合速度 (XY矢量合成)
+    if isfield(logs.EgoState, 'Xdot')
+        Ego.Vx = logs.EgoState.Xdot.Data;
+        Ego.Vy = logs.EgoState.Ydot.Data;
+    else
+        % 备用：差分计算
+        Ego.Vx = [0; diff(Ego.X)./diff(masterTime)];
+        Ego.Vy = [0; diff(Ego.Y)./diff(masterTime)];
+    end
+    Ego.AbsSpeed = sqrt(Ego.Vx.^2 + Ego.Vy.^2);
+
+    % --- B. 真值数据 (Ground Truth) ---
+    Target.Valid = false;
+    Target.Dist = nan(size(masterTime));
+    Target.RelVel = nan(size(masterTime));
+    Target.AbsSpeed = nan(size(masterTime));
+    
+    if isfield(logs, 'TargetState') && isfield(logs.TargetState, 'Location')
+        try
+            % 对齐真值坐标
+            tgt_loc = align_lin(logs.TargetState.Location);
+            Target.X = tgt_loc(:,1);
+            Target.Y = tgt_loc(:,2);
+            
+            % 计算真值距离
+            Target.Dist = sqrt((Target.X - Ego.X).^2 + (Target.Y - Ego.Y).^2);
+            
+            % 计算真值速度
+            tgt_vx = gradient(Target.X) ./ gradient(masterTime);
+            tgt_vy = gradient(Target.Y) ./ gradient(masterTime);
+            Target.AbsSpeed = sqrt(tgt_vx.^2 + tgt_vy.^2);
+            
+            % 计算真值相对速度
+            Target.RelVel = Target.AbsSpeed - Ego.AbsSpeed;
+            Target.Valid = true;
+        catch ME
+            warning('真值解析异常: %s', ME.message);
+        end
+    end
+
+    % --- C. 算法输出 (Algorithm/Selection) ---
+    % 这是你的 MATLAB Function 选出来的“最终目标”
+    Algo.Dist = align_lin(logs.FunctionOutput.rel_dist);
+    Algo.Vel  = align_lin(logs.FunctionOutput.rel_vel);
+    
+    % 如果你的总线里加了 target_id，在这里提取
+    if isfield(logs.FunctionOutput, 'target_id')
+        Algo.ID = align_id(logs.FunctionOutput.target_id);
+    else
+        Algo.ID = zeros(size(masterTime)); % 默认占位
+    end
+
+    % --- D. 追踪器原始数据 (Tracker Raw) ---
+    % 用于分析“看见了但没选”或者“幽灵物体”
+    % 假设 Log 中有 TrackerOutput.Tracks
+    num_max_tracks = 20;
+    Trk.AllDist = nan(length(masterTime), num_max_tracks);
+    Trk.AllIDs  = nan(length(masterTime), num_max_tracks);
+    
+    if isfield(logs, 'TrackerOutput')
+        rawTracks = logs.TrackerOutput.Tracks;
+        for i = 1:num_max_tracks
+            try
+                % 提取第 i 条航迹的时间序列
+                ts_state = rawTracks(i).State; 
+                ts_id    = rawTracks(i).TrackID;
+                
+                if isa(ts_state, 'timeseries') && length(ts_state.Time) > 1
+                    % 提取相对距离 (假设 State(1) 是 X)
+                    Trk.AllDist(:, i) = resample(timeseries(ts_state.Data(:,1), ts_state.Time), masterTime).Data;
+                    Trk.AllIDs(:, i)  = resample(timeseries(double(ts_id.Data), ts_id.Time), masterTime, 'nearest').Data;
+                end
+            catch
+                % 忽略空 track
+            end
+        end
+    end
+
+    %% 3. 数据可视化
+    fprintf('>>> 生成分析图表...\n');
+    fig = figure('Name', 'SimAnalysis', 'Color', 'w', 'Position', [100, 100, 1400, 900]);
+    t = tiledlayout(2, 2, 'TileSpacing', 'compact');
+    title(t, ['仿真分析报告 - ' char(timestamp)], 'Interpreter', 'none');
+
+    % 图1: 距离追踪与杂波分析 (Range Analysis)
+    nexttile; hold on; grid on; box on;
+    % 1.1 画出所有 Tracker 看到的物体 (灰色背景线) -> 用于发现幽灵
+    plot(masterTime, Trk.AllDist, 'Color', [0.85 0.85 0.85], 'LineWidth', 0.5, 'HandleVisibility', 'off');
+    % 1.2 画出真值 (绿色粗线)
+    plot(masterTime, Target.Dist, 'g', 'LineWidth', 2, 'DisplayName', 'Ground Truth');
+    % 1.3 画出算法最终锁定的目标 (红色虚线)
+    plot(masterTime, Algo.Dist, 'r--', 'LineWidth', 1.5, 'DisplayName', 'Selected Target');
+    % 1.4 标记 7.5m 警戒线
+    yline(7.5, 'b:', 'Alpha', 0.5, 'DisplayName', 'Ghost Line (7.5m)');
+    
+    ylabel('Distance (m)'); ylim([0, 150]);
+    title('1. 相对距离追踪 (含背景杂波)');
+    legend('Location', 'best');
+
+    % 图2: 速度一致性校验 (Doppler Check)
+    nexttile; hold on; grid on; box on;
+    plot(masterTime, Target.RelVel, 'g', 'LineWidth', 2, 'DisplayName', 'GT RelVel');
+    plot(masterTime, Algo.Vel, 'r--', 'LineWidth', 1.5, 'DisplayName', 'Radar RelVel');
+    yline(0, 'k-', 'Alpha', 0.3);
+    ylabel('Rel Speed (m/s)');
+    title('2. 相对速度 (判断静止/运动)');
+    legend('Location', 'best');
+
+    % 图3: 目标 ID 稳定性 (ID Stability)
+    nexttile; hold on; grid on; box on;
+    % 过滤掉 ID=0 (未选中) 的点
+    clean_ids = Algo.ID; clean_ids(clean_ids==0) = nan;
+    plot(masterTime, clean_ids, 'b.', 'MarkerSize', 10);
+    ylabel('Target ID');
+    title('3. 锁定目标的 ID 切换情况');
+    subtitle('频繁跳变意味着 Tracker 不稳定');
+
+    % 图4: 探测误差分析 (Error Analysis)
+    nexttile; hold on; grid on; box on;
+    err = abs(Algo.Dist - Target.Dist);
+    % 只有当雷达看到东西(dist<190)时才计算误差
+    err(Algo.Dist > 190) = nan; 
+    area(masterTime, err, 'FaceColor', 'r', 'FaceAlpha', 0.3, 'EdgeColor', 'none');
+    yline(1.0, 'k--', 'Label', 'Tolerance 1m');
+    ylabel('Abs Error (m)'); ylim([0, 5]);
+    title('4. 测距误差 (GT vs Radar)');
+
+    % 保存图片
+    saveas(fig, fullfile(saveDir, 'Analysis_Report.png'));
+
+    %% 4. 导出关键数据到 JSON
+    fprintf('>>> 导出 JSON 数据...\n');
+    
+    % 降采样 (每 0.1s 存一个点，减小文件体积)
+    step = max(1, floor(0.1 / mean(diff(masterTime))));
+    idx = 1:step:length(masterTime);
+    
+    JData.Time = masterTime(idx);
+    JData.SimInfo.RCS_Setting = 10; % 记录当前参数，方便对比
+    JData.SimInfo.Pitch_Setting = 1; 
+    
+    % 核心数据
+    JData.EgoSpd = Ego.AbsSpeed(idx);
+    JData.TgtSpd = Target.AbsSpeed(idx);
+    JData.GT_Dist = Target.Dist(idx);
+    JData.Radar_Dist = Algo.Dist(idx);
+    JData.Radar_RelVel = Algo.Vel(idx);
+    
+    % --- 关键新增数据 ---
+    
+    % 1. 目标 ID (判断是否切车)
+    JData.Target_ID = Algo.ID(idx);
+    
+    % 2. 幽灵物体标志位 (Ghost Flag)
+    % 逻辑：如果锁定距离在 5m-10m 之间，但真值距离大于 15m，标记为幽灵
+    is_ghost = (Algo.Dist(idx) > 5.0 & Algo.Dist(idx) < 10.0) & (Target.Dist(idx) > 15.0);
+    JData.Flag_Ghost = double(is_ghost);
+    
+    % 3. 丢失目标标志位 (Loss Flag)
+    % 逻辑：真值在 150m 以内，但雷达读数 > 190m (未检测到)
+    is_loss = (Target.Dist(idx) < 150.0) & (Algo.Dist(idx) > 190.0);
+    JData.Flag_Loss = double(is_loss);
+
+    % 保存
+    jsonStr = jsonencode(JData, 'PrettyPrint', true);
+    fid = fopen(fullfile(saveDir, 'SimLog.json'), 'w');
+    if fid > 0
+        fwrite(fid, jsonStr, 'char');
+        fclose(fid);
+        fprintf('    JSON 已保存: %s\n', fullfile(saveDir, 'SimLog.json'));
+    end
+    
+    fprintf('>>> ✅ 分析完成！\n');
+end
+
+% % --- 辅助函数：安全重采样 ---
+% function out_data = safe_resample(timeseries_obj, target_time, method)
+%     if isempty(timeseries_obj) || length(timeseries_obj.Time) < 2
+%         out_data = nan(size(target_time));
+%         return;
+%     end
+%     try
+%         ts_res = resample(timeseries_obj, target_time, method);
+%         out_data = ts_res.Data;
+%     catch
+%         out_data = nan(size(target_time));
+%     end
+% end
+
+% --- 辅助函数：安全重采样 (修复版 v2) ---
+function out_data = safe_resample(ts_obj, target_time, method)
+    % 1. 基础检查
+    if isempty(ts_obj) || length(ts_obj.Time) < 2
+        out_data = nan(size(target_time));
+        return;
+    end
+
+    try
+        % 2. 提取原始数据
+        t_raw = ts_obj.Time;
+        d_raw = ts_obj.Data;
+        
+        % 3. 去重 (interp1 不允许时间轴有重复点)
+        [t_unique, idx] = unique(t_raw);
+        d_unique = d_raw(idx, :);
+        
+        % 4. 使用 interp1 进行插值
+        % 关键点：最后一个参数 NaN 表示“超出范围的部分填空值”，不要报错
+        if strcmp(method, 'zoh') || strcmp(method, 'nearest')
+            % 处理 ID 类离散数据
+            out_data = interp1(t_unique, d_unique, target_time, 'nearest', 'extrap');
+        else
+            % 处理连续数值 (线性插值 + 边界填 NaN)
+            out_data = interp1(t_unique, d_unique, target_time, 'linear', NaN);
+        end
+    catch ME
+        % 如果还出错，打印日志并填空
+        fprintf('    [Warning] 重采样失败: %s\n', ME.message);
+        out_data = nan(size(target_time));
+    end
+end

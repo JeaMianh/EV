@@ -1,0 +1,15 @@
+{
+  "Time": 0,
+  "SimInfo": {
+    "RCS_Setting": 10,
+    "Pitch_Setting": 1
+  },
+  "EgoSpd": 0,
+  "TgtSpd": null,
+  "GT_Dist": null,
+  "Radar_Dist": null,
+  "Radar_RelVel": null,
+  "Target_ID": 0,
+  "Flag_Ghost": 0,
+  "Flag_Loss": 0
+}

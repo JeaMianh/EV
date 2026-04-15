@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SimLog Monitor Demo</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="backdrop"></div>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">MATLAB Autonomous Driving / MVP</p>
+        <h1>SimLog Monitor</h1>
+      </div>
+      <div class="topbar-meta">
+        <span class="badge" id="connection-status">SSE 连接中</span>
+        <span class="badge badge-subtle" id="watch-root">读取目录中...</span>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">Runs</p>
+              <h2>仿真列表</h2>
+            </div>
+            <button id="refresh-runs" class="ghost-button" type="button">刷新</button>
+          </div>
+          <div class="run-list" id="run-list"></div>
+        </section>
+
+        <section class="panel settings-panel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">AI Config</p>
+              <h2>API 配置</h2>
+            </div>
+          </div>
+          <form id="api-config-form" class="config-form">
+            <label>
+              <span>Base URL</span>
+              <input id="api-base-url" name="baseUrl" type="url" placeholder="https://api.openai.com/v1" />
+            </label>
+            <label>
+              <span>API Key</span>
+              <input id="api-key" name="apiKey" type="password" placeholder="sk-..." />
+            </label>
+            <label>
+              <span>Model</span>
+              <input id="api-model" name="model" type="text" placeholder="gpt-4.1-mini" />
+            </label>
+            <label>
+              <span>附加提示词</span>
+              <textarea
+                id="api-system-prompt"
+                name="systemPrompt"
+                rows="4"
+                placeholder="例如：更关注 radar 距离误差和 track management。"
+              ></textarea>
+            </label>
+            <label class="checkbox-row">
+              <input id="include-images" name="includeImages" type="checkbox" />
+              <span>聊天时附带当前运行图片给模型</span>
+            </label>
+            <p class="hint">配置只保存在浏览器本地，并在请求聊天接口时透传给后端。</p>
+          </form>
+        </section>
+      </aside>
+
+      <main class="dashboard">
+        <section class="panel hero-panel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">Overview</p>
+              <h2 id="run-title">选择一条运行记录</h2>
+            </div>
+            <div class="status-pack">
+              <span class="badge" id="run-status">等待选择</span>
+              <span class="badge badge-subtle" id="run-updated-at">--</span>
+            </div>
+          </div>
+
+          <div class="metric-strip" id="metric-strip"></div>
+
+          <div class="insight-columns">
+            <div>
+              <h3>自动洞察</h3>
+              <div id="insight-list" class="stack-list"></div>
+            </div>
+            <div>
+              <h3>建议优先项</h3>
+              <div id="suggestion-list" class="stack-list"></div>
+            </div>
+          </div>
+
+          <p id="parse-notice" class="parse-notice"></p>
+        </section>
+
+        <section id="chart-grid" class="chart-grid"></section>
+
+        <section class="split-grid">
+          <section class="panel image-panel">
+            <div class="panel-head">
+              <div>
+                <p class="panel-kicker">Plots</p>
+                <h2>分析图片</h2>
+              </div>
+            </div>
+            <div id="image-viewer" class="image-viewer"></div>
+            <div id="image-thumbs" class="image-thumbs"></div>
+          </section>
+
+          <section class="panel data-panel">
+            <div class="panel-head">
+              <div>
+                <p class="panel-kicker">Signals</p>
+                <h2>可用序列</h2>
+              </div>
+            </div>
+            <div id="series-table" class="series-table"></div>
+          </section>
+        </section>
+      </main>
+
+      <aside class="assistant-column">
+        <section class="panel chat-panel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">Assistant</p>
+              <h2>AI 助手</h2>
+            </div>
+          </div>
+
+          <div class="prompt-row">
+            <button class="chip-button" data-prompt="请先解释当前这次仿真的主要趋势和异常。">解释这次仿真</button>
+            <button class="chip-button" data-prompt="请结合图片和时序数据，给出 3 条最值得优先验证的优化建议。">给出优化建议</button>
+            <button class="chip-button" data-prompt="如果我要继续调试这个 radar 感知链路，下一轮实验应该怎么设计？">设计下一轮实验</button>
+          </div>
+
+          <div id="chat-messages" class="chat-messages"></div>
+
+          <form id="chat-form" class="chat-form">
+            <textarea
+              id="chat-input"
+              rows="4"
+              placeholder="例如：为什么 Radar_Dist 大部分时间是 200？图里能看出什么问题？"
+            ></textarea>
+            <button id="send-button" type="submit" class="primary-button">发送</button>
+          </form>
+        </section>
+      </aside>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+  </html>

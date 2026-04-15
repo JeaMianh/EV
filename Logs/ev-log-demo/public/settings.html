@@ -1,0 +1,157 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EV Log Copilot Settings</title>
+    <link rel="stylesheet" href="/styles.css?v=20260310-7" />
+  </head>
+  <body>
+    <header class="top-app-bar">
+      <div class="bar-brand">
+        <div class="brand-mark">EV</div>
+        <div>
+          <p class="eyebrow">Settings</p>
+          <h1>工作台设置</h1>
+        </div>
+      </div>
+      <nav class="page-nav" aria-label="主导航">
+        <a class="page-link" href="/">仿真总览</a>
+        <a class="page-link" href="/sessions">调试会话</a>
+        <a class="page-link active" href="/settings">设置</a>
+      </nav>
+      <div class="bar-actions"></div>
+    </header>
+
+    <main class="settings-shell">
+      <section class="settings-hero surface-card">
+        <div>
+          <p class="section-kicker">Provider</p>
+          <h2>统一管理 AI 提供方</h2>
+          <p class="supporting-text">
+            本地 CLI 提供方会直接复用这台机器上的登录状态。只有切到远程 API 模式时，才需要在这里配置 Base URL、API Key 和 Model。
+          </p>
+        </div>
+        <div class="settings-preview">
+          <div class="preview-pill">
+            <span class="preview-label">当前模式</span>
+            <strong id="providerPreviewText">Codex CLI</strong>
+          </div>
+          <div class="preview-pill">
+            <span class="preview-label">图片输入</span>
+            <strong id="imagePolicyText">开启</strong>
+          </div>
+        </div>
+      </section>
+
+      <div class="settings-grid">
+        <section class="surface-card settings-panel">
+          <div class="card-head">
+            <div>
+              <p class="section-kicker">Mode</p>
+              <h3>聊天模式</h3>
+            </div>
+          </div>
+          <form class="settings-page-form" id="settingsForm">
+            <label>
+              <span>AI 提供方</span>
+              <select id="providerTypeInput" name="providerType">
+                <option value="codex_cli">Codex CLI</option>
+                <option value="qwen_cli">Qwen Code</option>
+                <option value="iflow_cli">iFlow CLI</option>
+                <option value="openai_compatible">远程 API</option>
+              </select>
+            </label>
+
+            <div class="info-block" id="localCliInfoBlock">
+              <p>本地 CLI provider 会直接复用这台机器上的登录状态。主页面只展示“已连接 / 未检测到”，不会展示密钥。</p>
+            </div>
+
+            <div id="remoteSettingsGroup" hidden>
+              <label>
+                <span>Base URL</span>
+                <input id="baseUrlInput" name="baseUrl" type="text" placeholder="https://api.openai.com/v1" />
+              </label>
+              <label>
+                <span>API Key</span>
+                <input id="apiKeyInput" name="apiKey" type="password" placeholder="sk-..." />
+              </label>
+              <label>
+                <span>Model</span>
+                <input id="modelInput" name="model" type="text" placeholder="例如 gpt-4.1-mini" />
+              </label>
+            </div>
+          </form>
+        </section>
+
+        <section class="surface-card settings-panel">
+          <div class="card-head">
+            <div>
+              <p class="section-kicker">Conversation</p>
+              <h3>对话行为</h3>
+            </div>
+          </div>
+          <div class="settings-stack">
+            <label class="switch-row">
+              <div>
+                <strong>附带当前分析图片</strong>
+                <p class="supporting-text">开启后，会把当前选中的分析图片一并发给模型，便于解释图像现象。</p>
+              </div>
+              <input id="includeImageInput" name="includeImage" type="checkbox" />
+            </label>
+            <div class="info-block">
+              <p id="saveStatusText">配置会自动保存到本地浏览器。</p>
+            </div>
+            <button id="resetSettingsButton" class="outlined-button" type="button">恢复默认</button>
+          </div>
+        </section>
+
+        <section class="surface-card settings-panel settings-panel-wide">
+          <div class="card-head">
+            <div>
+              <p class="section-kicker">Diagnostics</p>
+              <h3>服务状态</h3>
+            </div>
+          </div>
+          <div class="diagnostics-grid">
+            <article class="diagnostic-item">
+              <span class="diagnostic-label">服务可用性</span>
+              <strong id="healthStatusText">检查中</strong>
+            </article>
+            <article class="diagnostic-item">
+              <span class="diagnostic-label">日志目录</span>
+              <strong id="logsRootText">-</strong>
+            </article>
+            <article class="diagnostic-item">
+              <span class="diagnostic-label">项目目录</span>
+              <strong id="projectRootText">-</strong>
+            </article>
+            <article class="diagnostic-item">
+              <span class="diagnostic-label">已发现 runs</span>
+              <strong id="runCountHealthText">-</strong>
+            </article>
+            <article class="diagnostic-item">
+              <span class="diagnostic-label">调试会话数</span>
+              <strong id="debugSessionCountText">-</strong>
+            </article>
+            <article class="diagnostic-item">
+              <span class="diagnostic-label">Codex CLI</span>
+              <strong id="codexStatusText">检查中</strong>
+            </article>
+            <article class="diagnostic-item">
+              <span class="diagnostic-label">Qwen Code</span>
+              <strong id="qwenStatusText">检查中</strong>
+            </article>
+            <article class="diagnostic-item">
+              <span class="diagnostic-label">iFlow CLI</span>
+              <strong id="iflowStatusText">检查中</strong>
+            </article>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script src="/settings-store.js?v=20260310-7"></script>
+    <script src="/settings.js?v=20260310-7"></script>
+  </body>
+</html>
